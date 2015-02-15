@@ -20,7 +20,7 @@ module Szn
       @uri      = URI.parse(process_url_params(args[:url],args[:headers]))
       @headers  = stringify_headers(args[:headers]) || {}
       @payload  = Szn::Payload.generate(args[:payload])
-      @processed_headers = make_headers headers
+      @processed_headers = make_headers args[:headers]
     end
 
     def execute &block
@@ -29,8 +29,10 @@ module Szn
         http.use_ssl = true
         http.verify_mode = OpenSSL::SSL::VERIFY_NONE
       end
-      request   = net_http_request_class(method).new(uri.request_uri, headers)
+      request   = net_http_request_class(method).new(uri.request_uri,processed_headers)
       response  = net_http_do_request http, request, payload ? payload.to_s : nil, &block
+    ensure
+      payload.close if payload
     end
 
     private
