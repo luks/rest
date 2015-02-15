@@ -1,20 +1,8 @@
-require "pry"
-require "net/http"
-require "uri"
-require "openssl"
-require "cgi"
-
-#f30454af68aa70369ab46f2cf3b742ffc0b928b1
-#x-oauth-basic
-headers = { "Authentication" => "f30454af68aa70369ab46f2cf3b742ffc0b928b1" }
 require 'tempfile'
 require 'stringio'
 require 'mime/types'
 
-
-
 module Szn
-
   module Payload
     extend self
 
@@ -176,7 +164,7 @@ module Szn
       def build_stream(params)
         b = "--#{boundary}"
 
-        @stream = Tempfile.new("RESTClient.Stream.#{rand(1000)}")
+        @stream = Tempfile.new("Szn::Rest.Stream.#{rand(1000)}")
         @stream.binmode
         @stream.write(b + EOL)
 
@@ -247,172 +235,4 @@ module Szn
       end
     end
   end
-
-
-
-
-
-  class Request
-
-    attr_reader :method, :url, :headers, :cookies,
-                :payload, :user, :password, :read_timeout, :max_redirects,
-                :open_timeout, :raw_response, :processed_headers, :args,
-                :ssl_opts,
-                :uri
-
-
-    def self.execute(args, & block)
-      new(args).execute(& block)
-    end
-
-    def initialize args
-      @method   = args[:method]
-      @headers  = args[:headers] || {}
-      @url      = process_url_params(args[:url], headers)
-      @user     = args[:user]
-      @password = args[:password]
-      @payload  = Payload.generate(args[:payload])
-      @uri      = URI.parse(args[:url])
-    end
-
-    def execute & block
-      net_http_request_class(method)
-      http = Net::HTTP.new(uri.host, uri.port)
-      if uri.is_a?(URI::HTTPS)
-        http.use_ssl = true
-        http.verify_mode = OpenSSL::SSL::VERIFY_NONE
-      end
-
-      request = net_http_request_class(method).new(uri.request_uri, headers)
-      request.basic_auth "lukapiske@gmail.com/token", "f30454af68aa70369ab46f2cf3b742ffc0b928b1"
-      request.set_form_data payload
-
-      response = http.request(request)
-      binding.pry
-    end
-
-    private
-
-    def net_http_request_class(method)
-      Net::HTTP.const_get(method.to_s.capitalize)
-    end
-
-    def process_url_params url, headers
-      url_params = {}
-      headers.delete_if do |key, value|
-        if 'params' == key.to_s.downcase && value.is_a?(Hash)
-          url_params.merge! value
-          true
-        else
-          false
-        end
-      end
-      unless url_params.empty?
-        query_string = url_params.collect { |k, v| "#{k.to_s}=#{CGI::escape(v.to_s)}" }.join('&')
-        url + "?#{query_string}"
-      else
-        url
-      end
-    end
-
-  end
-
-
-  class Rest
-
-    def self.get(url, headers={}, &block)
-      Request.execute(:method => :get, :url => url, :headers => headers, &block)
-    end
-
-    def self.post(url, payload, headers={}, &block)
-      Request.execute(:method => :post, :url => url, :payload => payload, :headers => headers, &block)
-    end
-
-    def self.patch(url, payload, headers={}, &block)
-      Request.execute(:method => :patch, :url => url, :payload => payload, :headers => headers, &block)
-    end
-
-    def self.put(url, payload, headers={}, &block)
-      Request.execute(:method => :put, :url => url, :payload => payload, :headers => headers, &block)
-    end
-
-    def self.delete(url, headers={}, &block)
-      Request.execute(:method => :delete, :url => url, :headers => headers, &block)
-    end
-
-    def self.head(url, headers={}, &block)
-      Request.execute(:method => :head, :url => url, :headers => headers, &block)
-    end
-
-    def self.options(url, headers={}, &block)
-      Request.execute(:method => :options, :url => url, :headers => headers, &block)
-    end
-
-  end
-
 end
-
-
-
-# class Resource
-#   attr_reader :url, :options, :block
-
-#   def initialize(url, options={}, &block)
-#     @url = url
-#     @block = block
-#     @options = options
-#   end
-
-#   def get(additional_headers={}, &block)
-#     headers = (options[:headers] || {}).merge(additional_headers)
-#     Request.execute(options.merge(
-#             :method => :get,
-#             :url => url,
-#             :headers => headers), &(block || @block))
-#   end
-
-#   def head(additional_headers={}, &block)
-#     headers = (options[:headers] || {}).merge(additional_headers)
-#     Request.execute(options.merge(
-#             :method => :head,
-#             :url => url,
-#             :headers => headers), &(block || @block))
-#   end
-
-#   def post(payload, additional_headers={}, &block)
-#     headers = (options[:headers] || {}).merge(additional_headers)
-#     Request.execute(options.merge(
-#             :method => :post,
-#             :url => url,
-#             :payload => payload,
-#             :headers => headers), &(block || @block))
-#   end
-
-#   def put(payload, additional_headers={}, &block)
-#     headers = (options[:headers] || {}).merge(additional_headers)
-#     Request.execute(options.merge(
-#             :method => :put,
-#             :url => url,
-#             :payload => payload,
-#             :headers => headers), &(block || @block))
-#   end
-
-#   def patch(payload, additional_headers={}, &block)
-#     headers = (options[:headers] || {}).merge(additional_headers)
-#     Request.execute(options.merge(
-#             :method => :patch,
-#             :url => url,
-#             :payload => payload,
-#             :headers => headers), &(block || @block))
-#   end
-
-#   def delete(additional_headers={}, &block)
-#     headers = (options[:headers] || {}).merge(additional_headers)
-#     Request.execute(options.merge(
-#             :method => :delete,
-#             :url => url,
-#             :headers => headers), &(block || @block))
-#   end
-# end
-
-binding.pry
