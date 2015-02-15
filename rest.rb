@@ -1,10 +1,5 @@
 require "pry"
 
-
-#f30454af68aa70369ab46f2cf3b742ffc0b928b1
-#x-oauth-basic
-#headers = { "Authentication" => "f30454af68aa70369ab46f2cf3b742ffc0b928b1" 
-
 require_relative "request.rb"
 require_relative "payload.rb"
 
