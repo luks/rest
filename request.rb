@@ -18,7 +18,7 @@ module Szn
       @args     = args
       @method   = args[:method]
       @uri      = URI.parse(process_url_params(args[:url],args[:headers]))
-      @headers  = stringify_headers(args[:headers]) || {}
+      @headers  = args[:headers] || {}
       @payload  = Szn::Payload.generate(args[:payload])
       @processed_headers = make_headers args[:headers]
     end
@@ -29,8 +29,8 @@ module Szn
         http.use_ssl = true
         http.verify_mode = OpenSSL::SSL::VERIFY_NONE
       end
-      request   = net_http_request_class(method).new(uri.request_uri,processed_headers)
-      response  = net_http_do_request http, request, payload ? payload.to_s : nil, &block
+      req       = net_http_request_class(method).new(uri.request_uri,processed_headers)
+      response  = net_http_do_request http, req, payload ? payload.to_s : nil, &block
     ensure
       payload.close if payload
     end
@@ -44,10 +44,8 @@ module Szn
     def net_http_do_request(http, req, body=nil, &block)
       if body != nil && body.respond_to?(:read)
         req.body_stream = body
-        return http.request(req, nil, &block)
-      else
-        return http.request(req, body, &block)
       end
+      return http.request(req, body, &block)
     end
 
     def process_url_params url, headers
