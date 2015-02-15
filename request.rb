@@ -1,42 +1,36 @@
+#       #request.basic_auth "{email}/token", "{token}"
 require "net/http"
 require "uri"
 require "openssl"
 require "cgi"
 
 module Szn
-
   class Request
 
-    attr_reader :args, :method, :uri, :headers, :payload,
-                :user, :password, :processed_headers,
+    attr_reader :args, :method, :uri, :headers,
+                :payload, :processed_headers
 
-
-    def self.execute(args, & block)
-      new(args).execute(& block)
+    def self.execute(args, &block)
+      new(args).execute(&block)
     end
 
     def initialize args
       @args     = args
       @method   = args[:method]
+      @uri      = URI.parse(process_url_params(args[:url],args[:headers]))
       @headers  = stringify_headers(args[:headers]) || {}
       @payload  = Szn::Payload.generate(args[:payload])
-      @uri      = URI.parse(process_url_params(args[:url],headers))
       @processed_headers = make_headers headers
-
     end
 
-    def execute & block
+    def execute &block
       http = Net::HTTP.new(uri.host, uri.port)
       if uri.is_a?(URI::HTTPS)
         http.use_ssl = true
         http.verify_mode = OpenSSL::SSL::VERIFY_NONE
       end
-      request = net_http_request_class(method).new(uri.request_uri, headers)
-      #request.basic_auth "{email}/token", "{token}"
-      response = net_http_do_request http, request, payload ? payload.to_s : nil, &block
-      binding.pry
-
-
+      request   = net_http_request_class(method).new(uri.request_uri, headers)
+      response  = net_http_do_request http, request, payload ? payload.to_s : nil, &block
     end
 
     private
@@ -75,7 +69,9 @@ module Szn
     def default_headers
       {
         :accept => '*/*',
-        :accept_encoding => 'gzip, deflate'
+        :accept_encoding => 'gzip, deflate',
+        :content_encoding => 'gzip',
+        :cache_control => 'no-cache'
       }
     end
 

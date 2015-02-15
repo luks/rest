@@ -1,6 +1,6 @@
-require 'tempfile'
-require 'stringio'
-require 'mime/types'
+require "tempfile"
+require "stringio"
+require "mime/types"
 
 module Szn
   module Payload

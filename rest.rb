@@ -5,7 +5,6 @@ require_relative "payload.rb"
 
 
 module Szn
-
   class Rest
 
     def self.get(url, headers={}, &block)
@@ -37,7 +36,6 @@ module Szn
     end
 
   end
-
 end
 
 
