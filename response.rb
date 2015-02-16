@@ -61,6 +61,7 @@ module Szn
       if request
         if request.max_redirects == 0
           #raise MaxRedirectsReached
+          raise ArgumentError, 'too many HTTP redirects'
         end
         args[:password]      = request.password
         args[:user]          = request.user
@@ -71,7 +72,7 @@ module Szn
           args[:headers][:cookies] = (args[:headers][:cookies] || {}).merge(parse_cookie(result['set-cookie']))
         end
       end
-      Request.exec args, &block
+      Request.run args, &block
     end
 
     def self.beautify_headers(headers)

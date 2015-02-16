@@ -3,7 +3,7 @@ require "stringio"
 require "mime/types"
 
 module Szn
-  module Payload
+  module Content
     extend self
 
     def generate(params)

@@ -1,4 +1,3 @@
-#       #request.basic_auth "{email}/token", "{token}"
 require "net/http"
 require "uri"
 require "openssl"
@@ -7,11 +6,10 @@ require "cgi"
 module Szn
   class Request
 
-    attr_reader :args, :method, :uri, :headers, :cookies,
-                :payload, :processed_headers, :max_redirects, :user, :password
+    attr_reader :args, :uri, :method, :headers, :cookies, :content, :processed_headers, :max_redirects, :user, :password
 
-    def self.exec(args, &block)
-      new(args).exec(&block)
+    def self.run(args, &block)
+      new(args).run(&block)
     end
 
     def initialize args
@@ -20,15 +18,17 @@ module Szn
       @uri      = URI.parse(process_url_params(args[:url],args[:headers]))
       @headers  = args[:headers] || {}
       @cookies  = @headers.delete(:cookies) || args[:cookies] || {}
-      @payload  = Szn::Payload.generate(args[:payload])
+      @content  = Szn::Content.generate(args[:content])
       @processed_headers = make_headers args[:headers]
       @max_redirects = args[:max_redirects] || 10
+      @user     = args[:user]
+      @password = args[:password]
     end
 
-    def exec &block
+    def run &block
       dispatch net_http_request_class(method).new(uri.request_uri,processed_headers), &block
     ensure
-      payload.close if payload
+      content.close if content
     end
 
     private
@@ -42,12 +42,16 @@ module Szn
         net.verify_mode = OpenSSL::SSL::VERIFY_NONE
       end
 
+      if user && passsword
+        req.basic_auth user, password
+      end
+
       net.start do |http|
         established_connection = true
         if @block_response
-          net_http_do_request(http, req, payload ? payload.to_s : nil, &@block_response)
+          net_http_do_request(http, req, content ? content.to_s : nil, &@block_response)
         else
-          res = net_http_do_request(http, req, payload ? payload.to_s : nil) \
+          res = net_http_do_request(http, req, content ? content.to_s : nil) \
             { |http_response| http_response }
           process_result res, &block
         end
@@ -133,7 +137,7 @@ module Szn
         user_headers[:cookie] = @cookies.map { |key, val| "#{key}=#{val}" }.sort.join('; ')
       end
       headers = stringify_headers(default_headers).merge(stringify_headers(user_headers))
-      headers.merge!(@payload.headers) if @payload
+      headers.merge!(@content.headers) if @content
       headers
     end
 
