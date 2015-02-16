@@ -10,8 +10,8 @@ module Szn
     attr_reader :args, :method, :uri, :headers,
                 :payload, :processed_headers
 
-    def self.execute(args, &block)
-      new(args).execute(&block)
+    def self.exec(args, &block)
+      new(args).exec(&block)
     end
 
     def initialize args
@@ -23,19 +23,26 @@ module Szn
       @processed_headers = make_headers args[:headers]
     end
 
-    def execute &block
-      http = Net::HTTP.new(uri.host, uri.port)
+    def exec &block
+      net = net_http_class.new(uri.host, uri.port)
       if uri.is_a?(URI::HTTPS)
-        http.use_ssl = true
-        http.verify_mode = OpenSSL::SSL::VERIFY_NONE
+        net.use_ssl = true
+        net.verify_mode = OpenSSL::SSL::VERIFY_NONE
       end
-      req       = net_http_request_class(method).new(uri.request_uri,processed_headers)
-      response  = net_http_do_request http, req, payload ? payload.to_s : nil, &block
+      net.start do |http|
+        req       = net_http_request_class(method).new(uri.request_uri,processed_headers)
+        res       = net_http_do_request http, req, payload ? payload.to_s : nil, &block
+        response  = Szn::Response.new(res)
+      end
     ensure
       payload.close if payload
     end
 
     private
+
+    def net_http_class
+      Net::HTTP
+    end
 
     def net_http_request_class(method)
       Net::HTTP.const_get(method.to_s.capitalize)
@@ -69,8 +76,8 @@ module Szn
     def default_headers
       {
         :accept => '*/*',
-        :accept_encoding => 'gzip, deflate',
-        :content_encoding => 'gzip',
+        #:accept_encoding => 'gzip, deflate',
+        #:content_encoding => 'gzip',
         :cache_control => 'no-cache'
       }
     end
