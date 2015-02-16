@@ -4,7 +4,6 @@ require_relative "request.rb"
 require_relative "content.rb"
 require_relative "response.rb"
 
-
 module Szn
   class Rest
 

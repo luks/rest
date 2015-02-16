@@ -1,5 +1,4 @@
 require "net/http"
-require "uri"
 require "openssl"
 require "cgi"
 
@@ -26,7 +25,7 @@ module Szn
     end
 
     def run &block
-      dispatch net_http_request_class(method).new(uri.request_uri,processed_headers), &block
+      dispatch net_http_request_class(method).new(uri, processed_headers), &block
     ensure
       content.close if content
     end
@@ -48,17 +47,12 @@ module Szn
 
       net.start do |http|
         established_connection = true
-        if @block_response
-          net_http_do_request(http, req, content ? content.to_s : nil, &@block_response)
-        else
-          res = net_http_do_request(http, req, content ? content.to_s : nil) \
-            { |http_response| http_response }
-          process_result res, &block
-        end
+        res = net_http_do_request(http, req, content ? content.to_s : nil)
+        process_result res, &block
       end
     end
 
-    def process_result res, & block
+    def process_result res, &block
       response = Szn::Response.new(res, args, self)
       if block_given?
         block.call(response, self, res, &block)
@@ -72,8 +66,6 @@ module Szn
       ! Regexp.new('[\x0-\x1f\x7f=;, ]').match(string)
     end
 
-    # Validate cookie values. Rather than following RFC 6265, allow anything
-    # but control characters, comma, and semicolon.
     def valid_cookie_value?(value)
       ! Regexp.new('[\x0-\x1f\x7f,;]').match(value)
     end

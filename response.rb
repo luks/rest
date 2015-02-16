@@ -1,3 +1,6 @@
+
+#res.response.is_a?(Net::HTTPSuccess)
+
 module Szn
   class Response
 
@@ -31,19 +34,23 @@ module Szn
       @code ||= response.code.to_i
     end
 
-    def return! request = nil, result = nil, & block
+    def return! request = nil, result = nil, &block
+
+      # when Net::HTTPSuccess then
+      #   response
+      # when Net::HTTPRedirection then
       if (200..207).include? code
         self
       elsif [301, 302, 307].include? code
         unless [:get, :head].include? args[:method]
           #raise Exceptions::EXCEPTIONS_MAP[code].new(self, code)
         else
-          follow_redirection(request, result, & block)
+          follow_redirection(request, result, &block)
         end
       elsif code == 303
         args[:method] = :get
-        args.delete :payload
-        follow_redirection(request, result, & block)
+        args.delete :content
+        follow_redirection(request, result, &block)
       #elsif Exceptions::EXCEPTIONS_MAP[code]
         #raise Exceptions::EXCEPTIONS_MAP[code].new(self, code)
       else
