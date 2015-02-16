@@ -7,8 +7,8 @@ require "cgi"
 module Szn
   class Request
 
-    attr_reader :args, :method, :uri, :headers,
-                :payload, :processed_headers
+    attr_reader :args, :method, :uri, :headers, :cookies,
+                :payload, :processed_headers, :max_redirects, :user, :password
 
     def self.exec(args, &block)
       new(args).exec(&block)
@@ -19,26 +19,60 @@ module Szn
       @method   = args[:method]
       @uri      = URI.parse(process_url_params(args[:url],args[:headers]))
       @headers  = args[:headers] || {}
+      @cookies  = @headers.delete(:cookies) || args[:cookies] || {}
       @payload  = Szn::Payload.generate(args[:payload])
       @processed_headers = make_headers args[:headers]
+      @max_redirects = args[:max_redirects] || 10
     end
 
     def exec &block
-      net = net_http_class.new(uri.host, uri.port)
-      if uri.is_a?(URI::HTTPS)
-        net.use_ssl = true
-        net.verify_mode = OpenSSL::SSL::VERIFY_NONE
-      end
-      net.start do |http|
-        req       = net_http_request_class(method).new(uri.request_uri,processed_headers)
-        res       = net_http_do_request http, req, payload ? payload.to_s : nil, &block
-        response  = Szn::Response.new(res)
-      end
+      dispatch net_http_request_class(method).new(uri.request_uri,processed_headers), &block
     ensure
       payload.close if payload
     end
 
     private
+
+    def dispatch req, &block
+
+      net = net_http_class.new(uri.host, uri.port)
+
+      if uri.is_a?(URI::HTTPS)
+        net.use_ssl = true
+        net.verify_mode = OpenSSL::SSL::VERIFY_NONE
+      end
+
+      net.start do |http|
+        established_connection = true
+        if @block_response
+          net_http_do_request(http, req, payload ? payload.to_s : nil, &@block_response)
+        else
+          res = net_http_do_request(http, req, payload ? payload.to_s : nil) \
+            { |http_response| http_response }
+          process_result res, &block
+        end
+      end
+    end
+
+    def process_result res, & block
+      response = Szn::Response.new(res, args, self)
+      if block_given?
+        block.call(response, self, res, &block)
+      else
+        response.return!(self, res, &block)
+      end
+    end
+
+    def valid_cookie_key?(string)
+      return false if string.empty?
+      ! Regexp.new('[\x0-\x1f\x7f=;, ]').match(string)
+    end
+
+    # Validate cookie values. Rather than following RFC 6265, allow anything
+    # but control characters, comma, and semicolon.
+    def valid_cookie_value?(value)
+      ! Regexp.new('[\x0-\x1f\x7f,;]').match(value)
+    end
 
     def net_http_class
       Net::HTTP
@@ -83,6 +117,21 @@ module Szn
     end
 
     def make_headers user_headers
+      unless @cookies.empty?
+        # Validate that the cookie names and values look sane. If you really
+        # want to pass scary characters, just set the Cookie header directly.
+        # RFC6265 is actually much more restrictive than we are.
+        @cookies.each do |key, val|
+          unless valid_cookie_key?(key)
+            raise ArgumentError.new("Invalid cookie name: #{key.inspect}")
+          end
+          unless valid_cookie_value?(val)
+            raise ArgumentError.new("Invalid cookie value: #{val.inspect}")
+          end
+        end
+
+        user_headers[:cookie] = @cookies.map { |key, val| "#{key}=#{val}" }.sort.join('; ')
+      end
       headers = stringify_headers(default_headers).merge(stringify_headers(user_headers))
       headers.merge!(@payload.headers) if @payload
       headers
